@@ -1167,13 +1167,38 @@ function animate() {
         selectedStationHalo.scale.setScalar(1 + Math.sin(animationTime * 5) * 0.1); // Subtle scale pulse
     }
 
-    // Pulse stations
+    // Dynamic scaling of station spheres based on zoom
+    const cameraDistance = camera.position.distanceTo(controls.target);
+    let dynamicScale = 1.0;
+
+    const MIN_STATION_SCALE = 0.3; // Minimum scale for stations when zoomed in
+    const MAX_STATION_SCALE = 1.0; // Maximum scale for stations when zoomed out (original size)
+    const CAMERA_MIN_DISTANCE_FOR_SCALE = 8; // Camera distance at which stations start scaling down
+    const CAMERA_MAX_DISTANCE_FOR_SCALE = 20; // Camera distance at which stations are at max scale
+
+    if (cameraDistance < CAMERA_MIN_DISTANCE_FOR_SCALE) {
+        dynamicScale = MIN_STATION_SCALE;
+    } else if (cameraDistance > CAMERA_MAX_DISTANCE_FOR_SCALE) {
+        dynamicScale = MAX_STATION_SCALE;
+    } else {
+        // Interpolate scale between min and max based on camera distance
+        const scaleRange = MAX_STATION_SCALE - MIN_STATION_SCALE;
+        const distanceRange = CAMERA_MAX_DISTANCE_FOR_SCALE - CAMERA_MIN_DISTANCE_FOR_SCALE;
+        const normalizedDistance = (cameraDistance - CAMERA_MIN_DISTANCE_FOR_SCALE) / distanceRange;
+        dynamicScale = MIN_STATION_SCALE + (normalizedDistance * scaleRange);
+    }
+
     stationMeshes.forEach((mesh, i) => {
-        if (mesh.visible) {
-            const pulseSpeed = 1.5 + (i % 10) * 0.1;
-            const scale = 1 + Math.sin(animationTime * pulseSpeed) * 0.15;
-            mesh.scale.set(scale, scale, scale);
+        // Apply dynamic scale, but also consider the existing pulse
+        const pulseScale = 1 + Math.sin(animationTime * (1.5 + (i % 10) * 0.1)) * 0.15;
+        let finalScale = dynamicScale * pulseScale;
+
+        // Ensure selected station highlight scale is maintained
+        if (mesh === previousSelectedStationMesh) {
+            finalScale = dynamicScale * 1.5; // Maintain larger scale for selected station
         }
+        
+        mesh.scale.set(finalScale, finalScale, finalScale);
     });
     
     controls.update();
