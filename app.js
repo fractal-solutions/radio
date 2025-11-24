@@ -638,11 +638,11 @@ function selectStation(station) {
         activeTrail.userData.direction = new THREE.Vector3(0, 0, 0).sub(activeTrail.userData.origin).normalize();
         activeTrail.userData.particles = []; // Array to hold trail particles
         activeTrail.userData.particleCount = 0;
-        activeTrail.userData.maxParticles = 50; // Max number of particles in the trail
-        activeTrail.userData.particleSpeed = 0.05;
-        activeTrail.userData.particleSize = 0.03;
-        activeTrail.userData.spawnInterval = 5; // Spawn a new particle every X frames
-        activeTrail.userData.frameCounter = 0;
+        activeTrail.userData.maxParticles = 100;
+        activeTrail.userData.particleSpeed = 0.08;
+        activeTrail.userData.particleSize = 0.1; // Increased for debugging
+        activeTrail.userData.spawnInterval = 3;
+        activeTrail.userData.maxLength = 5; // Increased for debugging
     }
     // --- End Connection Trail Logic ---
 }
@@ -1064,14 +1064,18 @@ function animate() {
         activeTrail.userData.frameCounter++;
         if (activeTrail.userData.frameCounter >= activeTrail.userData.spawnInterval) {
             const particleGeometry = new THREE.SphereGeometry(activeTrail.userData.particleSize, 4, 4);
-            const particleMaterial = new THREE.MeshBasicMaterial({
+            const particleMaterial = new THREE.MeshStandardMaterial({ // Changed to StandardMaterial
                 color: 0x4fc3f7,
+                emissive: 0x4fc3f7, // Make them glow
+                emissiveIntensity: 5.0, // Very bright for debugging
                 transparent: true,
                 opacity: 1,
                 blending: THREE.AdditiveBlending
             });
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            particle.position.copy(activeTrail.userData.origin);
+            // Offset initial position slightly outwards from the station sphere
+            const offsetDirection = activeTrail.userData.direction.clone().negate(); // Opposite direction of trail movement
+            particle.position.copy(activeTrail.userData.origin).add(offsetDirection.multiplyScalar(STATION_SIZE * 1.2)); // Start slightly outside the station sphere
             particle.userData.distance = 0; // Distance traveled by particle
             activeTrail.add(particle);
             activeTrail.userData.particles.push(particle);
