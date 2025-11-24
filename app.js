@@ -1,5 +1,5 @@
 // Global State
-let scene, camera, renderer, earth, earthGroup, controls, atmosphere, activeTrail, regionMarker, previousSelectedStationMesh, selectedStationHalo;
+let scene, camera, renderer, earth, earthGroup, controls, atmosphere, activeTrail, regionMarker, previousSelectedStationMesh, selectedStationHalo, textureLoader;
 let stations = [];
 let regions = {};
 let currentStation = null;
@@ -100,6 +100,7 @@ const STATION_SIZE = isMobile ? 0.08 : 0.06;
 
 function init() {
     audioElement = document.getElementById('audio-element');
+    textureLoader = new THREE.TextureLoader();
     
     // Load favorites
     const savedFavorites = localStorage.getItem('fractalradio_favorites');
@@ -183,7 +184,7 @@ function setupLights() {
 function createEarth() {
     earthGroup = new THREE.Group();
     
-    const geometry = new THREE.SphereGeometry(EARTH_RADIUS, isMobile ? 48 : 64, isMobile ? 48 : 64);
+    const earthGeometry = new THREE.SphereGeometry(EARTH_RADIUS, isMobile ? 48 : 64, isMobile ? 48 : 64);
     const material = new THREE.MeshStandardMaterial({
         color: 0x1a4a6a, // Darker blue for oceans
         emissive: 0x05101a, // Subtle dark emissive
@@ -193,17 +194,24 @@ function createEarth() {
         opacity: 0.95
     });
     
-    earth = new THREE.Mesh(geometry, material);
+    // Load and apply texture for landmasses
+    textureLoader.load('https://threejs.org/examples/textures/land_ocean_ice_cloud_2048.jpg', (texture) => { // Placeholder URL
+        material.map = texture;
+        material.needsUpdate = true;
+    });
+
+    earth = new THREE.Mesh(earthGeometry, material);
     earthGroup.add(earth);
 
-    // Add a wireframe overlay
+    // Add a wireframe overlay with sparser geometry
+    const wireframeGeometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.001, isMobile ? 16 : 24, isMobile ? 16 : 24); // Slightly larger to avoid z-fighting, reduced segments
     const wireframeMaterial = new THREE.MeshBasicMaterial({
         color: 0x4fc3f7, // A light blue for the grid lines
         wireframe: true,
         transparent: true,
         opacity: 0.15 // Subtle opacity
     });
-    const wireframe = new THREE.Mesh(geometry, wireframeMaterial);
+    const wireframe = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
     earthGroup.add(wireframe);
     
     const atmosphereGeometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.08, isMobile ? 32 : 64, isMobile ? 32 : 64);
@@ -214,7 +222,7 @@ function createEarth() {
         side: THREE.BackSide
     });
     atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
-    atmosphere = atmosphere; // Assign to global variable
+	atmosphere = atmosphere;
     earthGroup.add(atmosphere);
     
     scene.add(earthGroup);
