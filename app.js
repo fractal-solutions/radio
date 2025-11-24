@@ -1,5 +1,5 @@
 // Global State
-let scene, camera, renderer, earth, earthGroup, controls, atmosphere, activeTrail, regionMarker, previousSelectedStationMesh;
+let scene, camera, renderer, earth, earthGroup, controls, atmosphere, activeTrail, regionMarker, previousSelectedStationMesh, selectedStationHalo;
 let stations = [];
 let regions = {};
 let currentStation = null;
@@ -573,6 +573,9 @@ function selectStation(station) {
     playStation(station.url);
     updateFavoriteButton();
 
+    playStation(station.url);
+    updateFavoriteButton();
+
     // --- Station Highlight Logic ---
     if (previousSelectedStationMesh) {
         const prevStation = previousSelectedStationMesh.userData.station;
@@ -580,6 +583,7 @@ function selectStation(station) {
         previousSelectedStationMesh.material.emissive.copy(originalColor);
         previousSelectedStationMesh.material.emissiveIntensity = 0.5; // Revert to default
         previousSelectedStationMesh.scale.set(1, 1, 1); // Revert scale
+        previousSelectedStationMesh.material.opacity = 0.85; // Revert opacity
     }
 
     const stationMesh = stationMeshes.find(mesh => mesh.userData.station.id === station.id);
@@ -588,40 +592,57 @@ function selectStation(station) {
         stationMesh.material.emissive.setHex(0xffffff); // Bright white glow
         stationMesh.material.emissiveIntensity = 2.0; // More intense glow
         stationMesh.scale.set(1.5, 1.5, 1.5); // Make it larger
+        stationMesh.material.opacity = 1.0; // Ensure full opacity
 
         previousSelectedStationMesh = stationMesh;
+
+        // Create and add halo
+        if (selectedStationHalo) {
+            earthGroup.remove(selectedStationHalo);
+            selectedStationHalo.geometry.dispose();
+            selectedStationHalo.material.dispose();
+        }
+        const haloInnerRadius = STATION_SIZE * 1.8;
+        const haloOuterRadius = STATION_SIZE * 2.2;
+        const haloGeometry = new THREE.RingGeometry(haloInnerRadius, haloOuterRadius, 32);
+        const haloMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+        selectedStationHalo = new THREE.Mesh(haloGeometry, haloMaterial);
+        selectedStationHalo.position.copy(stationMesh.position);
+        // Orient the ring to face the camera or be perpendicular to the earth's surface
+        selectedStationHalo.lookAt(new THREE.Vector3(0,0,0)); // Face away from earth center
+        selectedStationHalo.rotateX(Math.PI / 2); // Make it flat on the surface
+        earthGroup.add(selectedStationHalo);
     }
     // --- End Station Highlight Logic ---
 
     // --- Connection Trail Logic ---
     if (activeTrail) {
         scene.remove(activeTrail);
-        activeTrail.geometry.dispose();
-        activeTrail.material.dispose();
+        activeTrail.children.forEach(child => {
+            child.geometry.dispose();
+            child.material.dispose();
+        });
+        activeTrail = null;
     }
 
     if (stationMesh) { // Use the found stationMesh for trail origin
-        const startPoint = stationMesh.position.clone();
-        const endPoint = new THREE.Vector3(0, 0, 0); // Trail goes towards center of earth
-
-        const points = [];
-        points.push(startPoint);
-        points.push(startPoint.clone().multiplyScalar(1.1)); // Short initial segment
-
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({
-            color: 0x4fc3f7,
-            transparent: true,
-            opacity: 1,
-            linewidth: 2 // Note: linewidth is not supported in WebGLRenderer for LineBasicMaterial
-        });
-        activeTrail = new THREE.Line(geometry, material);
+        activeTrail = new THREE.Group();
         scene.add(activeTrail);
-        activeTrail.userData.origin = startPoint;
-        activeTrail.userData.direction = endPoint.sub(startPoint).normalize();
-        activeTrail.userData.length = 0; // Current length of the trail
-        activeTrail.userData.maxLength = 2; // Max length of the trail
-        activeTrail.userData.speed = 0.05; // Speed of trail growth
+        activeTrail.userData.origin = stationMesh.position.clone();
+        activeTrail.userData.direction = new THREE.Vector3(0, 0, 0).sub(activeTrail.userData.origin).normalize();
+        activeTrail.userData.particles = []; // Array to hold trail particles
+        activeTrail.userData.particleCount = 0;
+        activeTrail.userData.maxParticles = 50; // Max number of particles in the trail
+        activeTrail.userData.particleSpeed = 0.05;
+        activeTrail.userData.particleSize = 0.03;
+        activeTrail.userData.spawnInterval = 5; // Spawn a new particle every X frames
+        activeTrail.userData.frameCounter = 0;
     }
     // --- End Connection Trail Logic ---
 }
@@ -744,7 +765,19 @@ function setupUI() {
         document.getElementById('station-list').style.display = 'none';
         document.getElementById('region-list').style.display = 'block';
         currentRegion = null;
-        stationMeshes.forEach(mesh => mesh.material.opacity = 0.85);
+        stationMeshes.forEach(mesh => mesh.material.opacity = 0.85); // This resets opacity for all
+
+        // Clear previous selected station highlight
+        previousSelectedStationMesh = null;
+
+        // Remove selected station halo
+        if (selectedStationHalo) {
+            earthGroup.remove(selectedStationHalo);
+            selectedStationHalo.geometry.dispose();
+            selectedStationHalo.material.dispose();
+            selectedStationHalo = null;
+        }
+
         // Remove region marker
         if (regionMarker) {
             scene.remove(regionMarker);
@@ -1026,28 +1059,48 @@ function animate() {
         atmosphere.material.opacity = 0.1 + Math.sin(animationTime * 2) * 0.05; // Base opacity + pulse
     }
 
-    // Animate active trail
+    // Animate active trail (particle system)
     if (activeTrail) {
-        activeTrail.userData.length += activeTrail.userData.speed;
-        if (activeTrail.userData.length > activeTrail.userData.maxLength) {
-            activeTrail.userData.length = activeTrail.userData.maxLength;
+        activeTrail.userData.frameCounter++;
+        if (activeTrail.userData.frameCounter >= activeTrail.userData.spawnInterval) {
+            const particleGeometry = new THREE.SphereGeometry(activeTrail.userData.particleSize, 4, 4);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: 0x4fc3f7,
+                transparent: true,
+                opacity: 1,
+                blending: THREE.AdditiveBlending
+            });
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.copy(activeTrail.userData.origin);
+            particle.userData.distance = 0; // Distance traveled by particle
+            activeTrail.add(particle);
+            activeTrail.userData.particles.push(particle);
+            activeTrail.userData.frameCounter = 0;
         }
 
-        const points = [];
-        points.push(activeTrail.userData.origin);
-        const currentEnd = activeTrail.userData.origin.clone().add(activeTrail.userData.direction.clone().multiplyScalar(activeTrail.userData.length));
-        points.push(currentEnd);
+        const particlesToRemove = [];
+        activeTrail.userData.particles.forEach((particle, index) => {
+            particle.position.add(activeTrail.userData.direction.clone().multiplyScalar(activeTrail.userData.particleSpeed));
+            particle.userData.distance += activeTrail.userData.particleSpeed;
 
-        activeTrail.geometry.setFromPoints(points);
-        activeTrail.geometry.attributes.position.needsUpdate = true;
+            // Fade out based on distance
+            const maxDistance = activeTrail.userData.maxLength;
+            particle.material.opacity = 1 - (particle.userData.distance / maxDistance);
+            particle.scale.setScalar(1 - (particle.userData.distance / maxDistance)); // Shrink as it fades
 
-        // Fade out the trail over time (or based on length)
-        activeTrail.material.opacity = 1 - (activeTrail.userData.length / activeTrail.userData.maxLength) * 0.5; // Fade to 0.5 opacity
-        if (activeTrail.material.opacity < 0.1) { // Remove if too faint
-            scene.remove(activeTrail);
-            activeTrail.geometry.dispose();
-            activeTrail.material.dispose();
-            activeTrail = null;
+            if (particle.material.opacity <= 0 || particle.userData.distance >= maxDistance) {
+                particlesToRemove.push(index);
+            }
+        });
+
+        // Remove particles
+        for (let i = particlesToRemove.length - 1; i >= 0; i--) {
+            const index = particlesToRemove[i];
+            const particle = activeTrail.userData.particles[index];
+            activeTrail.remove(particle);
+            particle.geometry.dispose();
+            particle.material.dispose();
+            activeTrail.userData.particles.splice(index, 1);
         }
     }
 
@@ -1056,6 +1109,12 @@ function animate() {
         const scale = 1 + Math.sin(animationTime * 3) * 0.2; // Pulsating scale
         regionMarker.scale.set(scale, scale, scale);
         regionMarker.material.opacity = 0.6 + Math.sin(animationTime * 3) * 0.2; // Pulsating opacity
+    }
+
+    // Animate selected station halo
+    if (selectedStationHalo) {
+        selectedStationHalo.material.opacity = 0.5 + Math.sin(animationTime * 5) * 0.3; // Pulsating opacity
+        selectedStationHalo.scale.setScalar(1 + Math.sin(animationTime * 5) * 0.1); // Subtle scale pulse
     }
 
     // Pulse stations
