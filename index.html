@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fractal Radio - Global Station Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loading-content">
+            <div class="loader"></div>
+            <div class="loading-text">TUNING RADIO WAVES</div>
+            <div class="loading-subtext">Connecting to global stations...</div>
+        </div>
+    </div>
+
+    <div id="scene-container"></div>
+    
+    <div id="ui-overlay">
+        <!-- Mobile Hamburger Menu -->
+        <button class="mobile-menu-btn" id="mobile-menu-btn">
+            <span class="hamburger"></span>
+        </button>
+
+        <!-- Top Navigation Bar -->
+        <div class="top-bar" id="top-bar">
+            <div class="top-bar-left">
+                <div class="app-logo">📻</div>
+                <div class="app-title">FRACTAL RADIO</div>
+            </div>
+            <div class="top-bar-center">
+                <div class="search-container">
+                    <input type="text" id="global-search" placeholder="Search stations worldwide..." />
+                </div>
+            </div>
+            <div class="top-bar-right">
+                <button class="icon-button" id="favorites-btn" title="Favorites">
+                    <span class="icon">♥</span>
+                    <span class="count" id="fav-count">0</span>
+                </button>
+                <button class="icon-button" id="fullscreen-btn" title="Fullscreen">⛶</button>
+            </div>
+        </div>
+
+        <!-- Left Panel - Region Browser -->
+        <div class="left-panel qt-panel" id="left-panel">
+            <div class="panel-header">
+                <span class="header-title">REGIONAL EXPLORER</span>
+            </div>
+            
+            <div class="region-search">
+                <input type="text" id="region-search" placeholder="Filter regions..." />
+            </div>
+
+            <div class="region-list" id="region-list">
+                <!-- Regions populated by JS -->
+            </div>
+
+            <div class="station-list" id="station-list" style="display: none;">
+                <div class="list-header">
+                    <button class="back-btn" id="back-to-regions">← Regions</button>
+                    <span id="current-region-name"></span>
+                </div>
+                <div class="station-search">
+                    <input type="text" id="station-search" placeholder="Search in region..." />
+                </div>
+                <div class="stations-container" id="stations-container">
+                    <!-- Stations populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Now Playing -->
+        <div class="right-panel qt-panel" id="right-panel">
+            <div class="panel-header">
+                <span class="header-title">NOW PLAYING</span>
+                <button class="mobile-close-btn" id="mobile-close-player">×</button>
+            </div>
+
+            <div class="now-playing">
+                <div class="station-artwork" id="station-artwork">
+                    <div class="artwork-placeholder">📻</div>
+                </div>
+                <div class="station-details">
+                    <div class="station-name" id="current-station">Select a station</div>
+                    <div class="station-location" id="current-location">---</div>
+                    <div class="station-meta">
+                        <span class="genre-tag" id="current-genre">---</span>
+                        <span class="stream-quality" id="stream-quality">---</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="scrollable-content">
+                <div class="audio-controls">
+                    <button class="play-button" id="play-btn">
+                        <span class="play-icon">▶</span>
+                    </button>
+                    <div class="loading-spinner" id="loading-spinner" style="display: none;">
+                        <div class="spinner"></div>
+                    </div>
+                    <div class="volume-section">
+                        <button class="mute-btn" id="mute-btn">🔊</button>
+                        <input type="range" class="volume-slider" id="volume" min="0" max="100" value="70" />
+                        <span class="volume-value" id="volume-value">70%</span>
+                    </div>
+                </div>
+
+                <div class="stream-status" id="stream-status">
+                    <div class="status-indicator" id="status-indicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Ready</span>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button class="action-btn" id="share-btn">
+                        <span class="icon">↗</span>
+                        <span>Share</span>
+                    </button>
+                    <button class="action-btn" id="add-favorite-btn">
+                        <span class="icon">♥</span>
+                        <span>Favorite</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Favorites Panel -->
+        <div class="favorites-panel qt-panel" id="favorites-panel">
+            <div class="panel-header">
+                <span class="header-title">FAVORITES</span>
+                <button class="close-favorites-btn" id="close-favorites-btn">×</button>
+            </div>
+            <div class="favorites-container" id="favorites-container">
+                <!-- Favorite stations will be populated here by JS -->
+            </div>
+            <p class="no-favorites-message" id="no-favorites-message">No favorites yet. Add some stations!</p>
+        </div>
+
+        <!-- Radio Roulette Button -->
+        <button class="roulette-btn" id="roulette-btn">
+            <div class="roulette-icon">🎲</div>
+            <div class="roulette-text">RADIO ROULETTE</div>
+            <div class="roulette-glow"></div>
+        </button>
+
+        <!-- Roulette Animation Overlay -->
+        <div class="roulette-overlay" id="roulette-overlay" style="display: none;">
+            <div class="roulette-content">
+                <div class="roulette-spinner">🌍</div>
+                <div class="roulette-countdown" id="roulette-countdown">3</div>
+                <div class="roulette-message">Spinning the globe...</div>
+            </div>
+        </div>
+
+        <!-- Mobile Bottom Player Bar -->
+        <div class="mobile-player-bar" id="mobile-player-bar">
+            <div class="mobile-player-info">
+                <div class="mobile-station-name" id="mobile-station">Select a station</div>
+                <div class="mobile-station-location" id="mobile-location">---</div>
+            </div>
+            <div class="mobile-player-controls">
+                <button class="mobile-play-btn" id="mobile-play-btn">▶</button>
+                <button class="mobile-expand-btn" id="mobile-expand-btn">↑</button>
+            </div>
+        </div>
+
+        <!-- Bottom Control Bar -->
+        <div class="bottom-bar" id="bottom-bar">
+            <div class="global-stats">
+                <div class="stat-item">
+                    <span class="stat-number" id="total-stations">0</span>
+                    <span class="stat-text">Stations</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="regions-covered">0</span>
+                    <span class="stat-text">Regions</span>
+                </div>
+            </div>
+
+            <div class="globe-controls">
+                <button class="control-btn" id="auto-rotate-btn" title="Auto-Rotate">↻</button>
+                <button class="control-btn" id="reset-view-btn" title="Reset View">⊙</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <span>🍓 Powered by <a href="https://berrry.app" target="_blank">Berrry Computer</a></span>
+    </div>
+
+    <audio id="audio-element" preload="none" crossorigin="anonymous"></audio>
+    
+    <script src="app.js"></script>
+</body>
+</html>
