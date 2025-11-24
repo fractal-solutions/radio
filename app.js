@@ -569,9 +569,11 @@ function selectStation(station) {
     // Update mobile player
     document.getElementById('mobile-station').textContent = station.name;
     document.getElementById('mobile-location').textContent = station.country;
+    document.getElementById('mobile-genre').textContent = station.genre.toUpperCase();
     
     playStation(station.url);
     updateFavoriteButton();
+    updateMobileFavoriteButton(); // Add this line
 
     playStation(station.url);
     updateFavoriteButton();
@@ -845,8 +847,11 @@ function setupUI() {
     // Mobile menu
     document.getElementById('mobile-menu-btn').addEventListener('click', toggleMobileMenu);
     
-    // Mobile expand player
-    document.getElementById('mobile-expand-btn').addEventListener('click', () => {
+    // Mobile favorite button
+    document.getElementById('mobile-favorite-btn').addEventListener('click', toggleFavorite);
+
+    // Mobile player info click to expand now playing
+    document.getElementById('mobile-player-info').addEventListener('click', () => {
         document.getElementById('right-panel').classList.add('mobile-expanded');
     });
     
@@ -915,6 +920,7 @@ function toggleFavorite() {
     localStorage.setItem('fractalradio_favorites', JSON.stringify(favorites));
     updateFavoriteButton();
     updateFavoriteCount();
+    updateMobileFavoriteButton(); // Add this line
 }
 
 function updateFavoriteButton() {
@@ -922,6 +928,22 @@ function updateFavoriteButton() {
     const isFavorite = favorites.some(f => f.id === currentStation.id);
     const btn = document.getElementById('add-favorite-btn');
     btn.style.background = isFavorite ? 'rgba(236, 64, 122, 0.2)' : '';
+}
+
+function updateMobileFavoriteButton() {
+    if (!currentStation) return;
+    const isFavorite = favorites.some(f => f.id === currentStation.id);
+    const btn = document.getElementById('mobile-favorite-btn');
+    if (btn) { // Check if button exists (only on mobile)
+        btn.textContent = isFavorite ? '♥' : '♡';
+        if (isFavorite) {
+            btn.style.background = '#ec407a'; // Fully pinkish-red
+            btn.style.color = '#ffffff';
+        } else {
+            btn.style.background = '#2d2d30'; // Dull color
+            btn.style.color = '#cccccc';
+        }
+    }
 }
 
 function updateFavoriteCount() {

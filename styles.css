@@ -874,6 +874,13 @@ body {
     text-overflow: ellipsis;
 }
 
+.mobile-station-genre {
+    font-size: 9px;
+    color: #4fc3f7;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
 .mobile-player-controls {
     display: flex;
     align-items: center;
@@ -881,7 +888,7 @@ body {
     flex-shrink: 0;
 }
 
-.mobile-play-btn, .mobile-expand-btn {
+.mobile-play-btn {
     width: 44px;
     height: 44px;
     border-radius: 50%;
@@ -894,6 +901,28 @@ body {
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
+}
+
+.mobile-favorite-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #ec407a; /* Pinkish-red for favorite */
+    border: none;
+    color: #ffffff; /* White heart icon */
+    font-size: 16px;
+    line-height: 1; /* Ensure consistent line height */
+    font-weight: normal; /* Ensure consistent font weight */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.mobile-favorite-btn:hover {
+    box-shadow: 0 0 12px rgba(236, 64, 122, 0.5);
 }
 
 .mobile-expand-btn {
