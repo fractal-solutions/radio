@@ -555,6 +555,10 @@ function easeInOutCubic(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
+function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+}
+
 function highlightRegionStations(regionStations) {
     const regionIds = new Set(regionStations.map(s => s.id));
     
@@ -606,27 +610,22 @@ function selectStation(station) {
 
         previousSelectedStationMesh = stationMesh;
 
-        // Create and add halo
+        // Create and add halo (now a group for multiple rings)
         if (selectedStationHalo) {
             earthGroup.remove(selectedStationHalo);
-            selectedStationHalo.geometry.dispose();
-            selectedStationHalo.material.dispose();
+            selectedStationHalo.children.forEach(child => {
+                child.geometry.dispose();
+                child.material.dispose();
+            });
+            selectedStationHalo = null;
         }
-        const haloInnerRadius = STATION_SIZE * 1.8;
-        const haloOuterRadius = STATION_SIZE * 2.2;
-        const haloGeometry = new THREE.RingGeometry(haloInnerRadius, haloOuterRadius, 32);
-        const haloMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending
-        });
-        selectedStationHalo = new THREE.Mesh(haloGeometry, haloMaterial);
+        selectedStationHalo = new THREE.Group();
         selectedStationHalo.position.copy(stationMesh.position);
-        // Orient the ring to face the camera or be perpendicular to the earth's surface
-        selectedStationHalo.lookAt(new THREE.Vector3(0,0,0)); // Face away from earth center
+        selectedStationHalo.lookAt(new THREE.Vector3(0,0,0)); // Orient the group
         selectedStationHalo.rotateX(Math.PI / 2); // Make it flat on the surface
+        selectedStationHalo.userData.spawnCounter = 0;
+        selectedStationHalo.userData.spawnInterval = 15; // Spawn a new ring every X frames
+        selectedStationHalo.userData.ringColor = new THREE.Color(genreColors[station.genre] || genreColors.default);
         earthGroup.add(selectedStationHalo);
     }
     // --- End Station Highlight Logic ---
@@ -1161,10 +1160,58 @@ function animate() {
         regionMarker.material.opacity = 0.6 + Math.sin(animationTime * 3) * 0.2; // Pulsating opacity
     }
 
-    // Animate selected station halo
+    // Animate selected station halo (multiple rings)
     if (selectedStationHalo) {
-        selectedStationHalo.material.opacity = 0.5 + Math.sin(animationTime * 5) * 0.3; // Pulsating opacity
-        selectedStationHalo.scale.setScalar(1 + Math.sin(animationTime * 5) * 0.1); // Subtle scale pulse
+        selectedStationHalo.userData.spawnCounter++;
+        if (selectedStationHalo.userData.spawnCounter >= selectedStationHalo.userData.spawnInterval) {
+            const ringInnerRadius = STATION_SIZE * 1.5;
+            const ringOuterRadius = STATION_SIZE * 1.6; // Initial small ring
+            const ringGeometry = new THREE.RingGeometry(ringInnerRadius, ringOuterRadius, 32);
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: selectedStationHalo.userData.ringColor,
+                transparent: true,
+                opacity: 1.0,
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.userData.startTime = animationTime; // Use animationTime for consistent timing
+            selectedStationHalo.add(ring);
+            selectedStationHalo.userData.spawnCounter = 0;
+        }
+
+        const ringsToRemove = [];
+        selectedStationHalo.children.forEach((ring, index) => {
+            const elapsedTime = animationTime - ring.userData.startTime;
+            const duration = 1.5; // Duration for ring expansion and fade
+
+            if (elapsedTime > duration) {
+                ringsToRemove.push(index);
+                return;
+            }
+
+            const progress = elapsedTime / duration;
+            const easedProgress = easeOutCubic(progress); // Use an easing function for smoother animation
+
+            // Expand ring
+            const currentInnerRadius = STATION_SIZE * 1.5 + (STATION_SIZE * 2 * easedProgress);
+            const currentOuterRadius = STATION_SIZE * 1.6 + (STATION_SIZE * 2.5 * easedProgress);
+            ring.geometry.dispose(); // Dispose old geometry
+            ring.geometry = new THREE.RingGeometry(currentInnerRadius, currentOuterRadius, 32);
+            ring.geometry.needsUpdate = true;
+
+            // Fade opacity
+            ring.material.opacity = 1.0 - easedProgress;
+        });
+
+        // Remove rings
+        for (let i = ringsToRemove.length - 1; i >= 0; i--) {
+            const index = ringsToRemove[i];
+            const ring = selectedStationHalo.children[index];
+            selectedStationHalo.remove(ring);
+            ring.geometry.dispose();
+            ring.material.dispose();
+        }
     }
 
     // Dynamic scaling of station spheres based on zoom
