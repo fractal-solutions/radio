@@ -1,5 +1,5 @@
 // Global State
-let scene, camera, renderer, earth, earthGroup, controls;
+let scene, camera, renderer, earth, earthGroup, controls, atmosphere, activeTrail, regionMarker, previousSelectedStationMesh;
 let stations = [];
 let regions = {};
 let currentStation = null;
@@ -184,16 +184,27 @@ function createEarth() {
     earthGroup = new THREE.Group();
     
     const geometry = new THREE.SphereGeometry(EARTH_RADIUS, isMobile ? 48 : 64, isMobile ? 48 : 64);
-    const material = new THREE.MeshPhongMaterial({
-        color: 0x2d5a7a,
-        emissive: 0x0d1a2a,
-        shininess: 40,
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x1a4a6a, // Darker blue for oceans
+        emissive: 0x05101a, // Subtle dark emissive
+        roughness: 0.8, // Less reflective
+        metalness: 0.1, // Slightly metallic feel
         transparent: true,
         opacity: 0.95
     });
     
     earth = new THREE.Mesh(geometry, material);
     earthGroup.add(earth);
+
+    // Add a wireframe overlay
+    const wireframeMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4fc3f7, // A light blue for the grid lines
+        wireframe: true,
+        transparent: true,
+        opacity: 0.15 // Subtle opacity
+    });
+    const wireframe = new THREE.Mesh(geometry, wireframeMaterial);
+    earthGroup.add(wireframe);
     
     const atmosphereGeometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.08, isMobile ? 32 : 64, isMobile ? 32 : 64);
     const atmosphereMaterial = new THREE.MeshBasicMaterial({
@@ -202,7 +213,8 @@ function createEarth() {
         opacity: 0.1,
         side: THREE.BackSide
     });
-    const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+    atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+    atmosphere = atmosphere; // Assign to global variable
     earthGroup.add(atmosphere);
     
     scene.add(earthGroup);
@@ -344,8 +356,12 @@ function createStationMeshes() {
     stations.forEach(station => {
         const geometry = new THREE.SphereGeometry(STATION_SIZE, 8, 8);
         const color = genreColors[station.genre] || genreColors.default;
-        const material = new THREE.MeshBasicMaterial({
+        const material = new THREE.MeshStandardMaterial({ // Changed to StandardMaterial
             color: color,
+            emissive: color, // Make them glow with their genre color
+            emissiveIntensity: 0.5, // Adjust glow intensity
+            roughness: 0.5,
+            metalness: 0.5,
             transparent: true,
             opacity: 0.85
         });
@@ -434,6 +450,26 @@ function selectRegion(regionName) {
     renderStationList(region.stations);
     focusOnRegion(region);
     highlightRegionStations(region.stations);
+
+    // --- Region Marker Logic ---
+    if (regionMarker) {
+        scene.remove(regionMarker);
+        regionMarker.geometry.dispose();
+        regionMarker.material.dispose();
+    }
+
+    const markerPosition = latLonToVector3(region.center.lat, region.center.lon, EARTH_RADIUS * 1.1); // Slightly above earth
+    const markerGeometry = new THREE.SphereGeometry(0.2, 16, 16); // Small sphere
+    const markerMaterial = new THREE.MeshBasicMaterial({
+        color: region.color, // Use region's color
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending // For a glowing effect
+    });
+    regionMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+    regionMarker.position.copy(markerPosition);
+    scene.add(regionMarker);
+    // --- End Region Marker Logic ---
 }
 
 function renderStationList(stationList) {
@@ -536,6 +572,58 @@ function selectStation(station) {
     
     playStation(station.url);
     updateFavoriteButton();
+
+    // --- Station Highlight Logic ---
+    if (previousSelectedStationMesh) {
+        const prevStation = previousSelectedStationMesh.userData.station;
+        const originalColor = new THREE.Color(genreColors[prevStation.genre] || genreColors.default);
+        previousSelectedStationMesh.material.emissive.copy(originalColor);
+        previousSelectedStationMesh.material.emissiveIntensity = 0.5; // Revert to default
+        previousSelectedStationMesh.scale.set(1, 1, 1); // Revert scale
+    }
+
+    const stationMesh = stationMeshes.find(mesh => mesh.userData.station.id === station.id);
+    if (stationMesh) {
+        // Apply highlight
+        stationMesh.material.emissive.setHex(0xffffff); // Bright white glow
+        stationMesh.material.emissiveIntensity = 2.0; // More intense glow
+        stationMesh.scale.set(1.5, 1.5, 1.5); // Make it larger
+
+        previousSelectedStationMesh = stationMesh;
+    }
+    // --- End Station Highlight Logic ---
+
+    // --- Connection Trail Logic ---
+    if (activeTrail) {
+        scene.remove(activeTrail);
+        activeTrail.geometry.dispose();
+        activeTrail.material.dispose();
+    }
+
+    if (stationMesh) { // Use the found stationMesh for trail origin
+        const startPoint = stationMesh.position.clone();
+        const endPoint = new THREE.Vector3(0, 0, 0); // Trail goes towards center of earth
+
+        const points = [];
+        points.push(startPoint);
+        points.push(startPoint.clone().multiplyScalar(1.1)); // Short initial segment
+
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({
+            color: 0x4fc3f7,
+            transparent: true,
+            opacity: 1,
+            linewidth: 2 // Note: linewidth is not supported in WebGLRenderer for LineBasicMaterial
+        });
+        activeTrail = new THREE.Line(geometry, material);
+        scene.add(activeTrail);
+        activeTrail.userData.origin = startPoint;
+        activeTrail.userData.direction = endPoint.sub(startPoint).normalize();
+        activeTrail.userData.length = 0; // Current length of the trail
+        activeTrail.userData.maxLength = 2; // Max length of the trail
+        activeTrail.userData.speed = 0.05; // Speed of trail growth
+    }
+    // --- End Connection Trail Logic ---
 }
 
 function playStation(url) {
@@ -657,6 +745,13 @@ function setupUI() {
         document.getElementById('region-list').style.display = 'block';
         currentRegion = null;
         stationMeshes.forEach(mesh => mesh.material.opacity = 0.85);
+        // Remove region marker
+        if (regionMarker) {
+            scene.remove(regionMarker);
+            regionMarker.geometry.dispose();
+            regionMarker.material.dispose();
+            regionMarker = null;
+        }
     });
     
     // Favorites
@@ -926,6 +1021,43 @@ function animate() {
         earthGroup.rotation.y += 0.001;
     }
     
+    // Pulsating atmosphere
+    if (atmosphere) {
+        atmosphere.material.opacity = 0.1 + Math.sin(animationTime * 2) * 0.05; // Base opacity + pulse
+    }
+
+    // Animate active trail
+    if (activeTrail) {
+        activeTrail.userData.length += activeTrail.userData.speed;
+        if (activeTrail.userData.length > activeTrail.userData.maxLength) {
+            activeTrail.userData.length = activeTrail.userData.maxLength;
+        }
+
+        const points = [];
+        points.push(activeTrail.userData.origin);
+        const currentEnd = activeTrail.userData.origin.clone().add(activeTrail.userData.direction.clone().multiplyScalar(activeTrail.userData.length));
+        points.push(currentEnd);
+
+        activeTrail.geometry.setFromPoints(points);
+        activeTrail.geometry.attributes.position.needsUpdate = true;
+
+        // Fade out the trail over time (or based on length)
+        activeTrail.material.opacity = 1 - (activeTrail.userData.length / activeTrail.userData.maxLength) * 0.5; // Fade to 0.5 opacity
+        if (activeTrail.material.opacity < 0.1) { // Remove if too faint
+            scene.remove(activeTrail);
+            activeTrail.geometry.dispose();
+            activeTrail.material.dispose();
+            activeTrail = null;
+        }
+    }
+
+    // Animate region marker
+    if (regionMarker) {
+        const scale = 1 + Math.sin(animationTime * 3) * 0.2; // Pulsating scale
+        regionMarker.scale.set(scale, scale, scale);
+        regionMarker.material.opacity = 0.6 + Math.sin(animationTime * 3) * 0.2; // Pulsating opacity
+    }
+
     // Pulse stations
     stationMeshes.forEach((mesh, i) => {
         if (mesh.visible) {
