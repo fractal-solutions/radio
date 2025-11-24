@@ -1124,9 +1124,9 @@ body {
         right: 0;
         bottom: 0;
         width: 100%;
-        max-height: 100vh;
+        height: calc(100vh - 64px); /* Adjusted to leave space for mobile player bar */
         border-radius: 0;
-        z-index: 500;
+        z-index: 1002; /* Increased z-index to appear above hamburger */
         overflow-y: auto;
     }
 

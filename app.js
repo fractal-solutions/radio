@@ -705,9 +705,11 @@ function showLoading(show) {
 }
 
 function updatePlayButtons(playing) {
-    const icon = playing ? '⏸' : '▶';
-    document.querySelector('#play-btn .play-icon').textContent = icon;
-    document.getElementById('mobile-play-btn').textContent = icon;
+    const playSvg = '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M8 5v14l11-7z"/><path d="M0 0h24v24H0z" fill="none"/></svg>';
+    const pauseSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+
+    document.querySelector('#play-btn .play-icon').innerHTML = playing ? pauseSvg : playSvg;
+    document.getElementById('mobile-play-btn').innerHTML = playing ? pauseSvg : playSvg;
 }
 
 function setupAudioHandlers() {
@@ -724,11 +726,13 @@ function setupAudioHandlers() {
         isPlaying = true;
         setStatus('Playing', 'playing');
         showLoading(false);
+        updatePlayButtons(true); // Add this line
     });
     
     audioElement.addEventListener('pause', () => {
         isPlaying = false;
         setStatus('Paused', 'paused');
+        updatePlayButtons(false); // Add this line
     });
     
     audioElement.addEventListener('error', () => {
@@ -927,15 +931,27 @@ function updateFavoriteButton() {
     if (!currentStation) return;
     const isFavorite = favorites.some(f => f.id === currentStation.id);
     const btn = document.getElementById('add-favorite-btn');
-    btn.style.background = isFavorite ? 'rgba(236, 64, 122, 0.2)' : '';
+    const iconSpan = btn.querySelector('.icon'); // Get the icon span
+    const filledHeartSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.49 5.49 0 0 1 8 3.05c1.74 0 3.41.81 4.5 2.09C13.09 3.86 14.76 3.05 16.5 3.05A5.49 5.49 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.43L12 21.35z"/></svg>';
+    const outlineHeartSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.49 5.49 0 0 1 8 3.05c1.74 0 3.41.81 4.5 2.09C13.09 3.86 14.76 3.05 16.5 3.05A5.49 5.49 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.43L12 21.35z"/></svg>';
+
+    if (iconSpan) { // Check if icon span exists
+        iconSpan.innerHTML = isFavorite ? filledHeartSvg : outlineHeartSvg;
+    }
+    if (btn) {
+        btn.style.background = isFavorite ? 'rgba(236, 64, 122, 0.2)' : '';
+    }
 }
 
 function updateMobileFavoriteButton() {
     if (!currentStation) return;
     const isFavorite = favorites.some(f => f.id === currentStation.id);
     const btn = document.getElementById('mobile-favorite-btn');
+    const filledHeartSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.49 5.49 0 0 1 8 3.05c1.74 0 3.41.81 4.5 2.09C13.09 3.86 14.76 3.05 16.5 3.05A5.49 5.49 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.43L12 21.35z"/></svg>';
+    const outlineHeartSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.49 5.49 0 0 1 8 3.05c1.74 0 3.41.81 4.5 2.09C13.09 3.86 14.76 3.05 16.5 3.05A5.49 5.49 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.43L12 21.35z"/></svg>';
+
     if (btn) { // Check if button exists (only on mobile)
-        btn.textContent = isFavorite ? '♥' : '♡';
+        btn.innerHTML = isFavorite ? filledHeartSvg : outlineHeartSvg;
         if (isFavorite) {
             btn.style.background = '#ec407a'; // Fully pinkish-red
             btn.style.color = '#ffffff';
