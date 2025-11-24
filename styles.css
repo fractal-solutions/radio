@@ -1020,7 +1020,8 @@ body {
 .region-list::-webkit-scrollbar,
 .stations-container::-webkit-scrollbar,
 .right-panel::-webkit-scrollbar,
-#station-list::-webkit-scrollbar {
+#station-list::-webkit-scrollbar,
+.favorites-container::-webkit-scrollbar { /* Added .favorites-container */
     width: 0px;
     background: transparent; /* make scrollbar transparent */
 }
@@ -1028,21 +1029,24 @@ body {
 .region-list::-webkit-scrollbar-track,
 .stations-container::-webkit-scrollbar-track,
 .right-panel::-webkit-scrollbar-track,
-#station-list::-webkit-scrollbar-track {
+#station-list::-webkit-scrollbar-track,
+.favorites-container::-webkit-scrollbar-track { /* Added .favorites-container */
     background: transparent; /* make scrollbar track transparent */
 }
 
 .region-list::-webkit-scrollbar-thumb,
 .stations-container::-webkit-scrollbar-thumb,
 .right-panel::-webkit-scrollbar-thumb,
-#station-list::-webkit-scrollbar-thumb {
+#station-list::-webkit-scrollbar-thumb,
+.favorites-container::-webkit-scrollbar-thumb { /* Added .favorites-container */
     background: transparent; /* make scrollbar thumb transparent */
 }
 
 .region-list::-webkit-scrollbar-thumb:hover,
 .stations-container::-webkit-scrollbar-thumb:hover,
 .right-panel::-webkit-scrollbar-thumb:hover,
-#station-list::-webkit-scrollbar-thumb:hover {
+#station-list::-webkit-scrollbar-thumb:hover,
+.favorites-container::-webkit-scrollbar-thumb:hover { /* Added .favorites-container */
     background: transparent; /* make scrollbar thumb transparent on hover */
 }
 
